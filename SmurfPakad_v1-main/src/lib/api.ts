@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { enrichGraphRisk } from './graphRisk';
 
 /**
  * SmurfPakad API Client
@@ -90,8 +91,18 @@ export interface GraphLink {
 
 export interface GraphData {
   nodes: GraphNode[];
-  links: GraphLink[];
+  /** Backend + UltraGraphVisualization use `edges` */
+  edges?: GraphLink[];
+  /** Legacy / mock alias — prefer `edges` */
+  links?: GraphLink[];
   metadata?: { totalNodes: number; totalEdges: number; suspiciousCount: number };
+  meta?: {
+    k?: number;
+    hop?: number;
+    total_nodes?: number;
+    total_edges?: number;
+    generated_at?: string;
+  };
   summary?: {
     top_illicit_ratio: number;
     fan_out_nodes: number;
@@ -452,6 +463,17 @@ export const analysisApi = {
 
 // ─── Graph API ────────────────────────────────────────────────────────────────
 
+const MOCK_GRAPH_LINKS: GraphLink[] = [
+  { source: 'wallet_0175@crypto_btc', target: 'mule_004@paytm',           suspicious: true,  weight: 0.92 },
+  { source: 'wallet_0018@paytm',      target: 'mule_004@paytm',           suspicious: true,  weight: 0.87 },
+  { source: 'wallet_0005@gpay',       target: 'mule_006@paytm',           suspicious: true,  weight: 0.76 },
+  { source: 'wallet_0136@bhim',       target: 'mule_008@paytm',           suspicious: false, weight: 0.42 },
+  { source: 'mule_004@paytm',         target: 'collector_001@crypto_eth', suspicious: true,  weight: 0.98 },
+  { source: 'mule_006@paytm',         target: 'collector_001@crypto_eth', suspicious: true,  weight: 0.87 },
+  { source: 'mule_008@paytm',         target: 'collector_001@crypto_eth', suspicious: true,  weight: 0.76 },
+  { source: 'wallet_0047@bhim',       target: 'collector_001@crypto_eth', suspicious: true,  weight: 0.71 },
+];
+
 const MOCK_GRAPH: GraphData = {
   nodes: [
     { id: 'collector_001@crypto_eth', suspicious_score: 0.98, degree: { in: 10, out: 2 }, riskLevel: 'critical', type: 'suspicious', risk: 0.98 },
@@ -465,16 +487,8 @@ const MOCK_GRAPH: GraphData = {
     { id: 'wallet_0022@phonepe',      suspicious_score: 0.38, degree: { in: 2, out: 2 },  riskLevel: 'low',      type: 'neighbor',   risk: 0.38 },
     { id: 'wallet_0047@bhim',         suspicious_score: 0.71, degree: { in: 3, out: 1 },  riskLevel: 'high',     type: 'suspicious', risk: 0.71 },
   ],
-  links: [
-    { source: 'wallet_0175@crypto_btc', target: 'mule_004@paytm',           suspicious: true,  weight: 0.92 },
-    { source: 'wallet_0018@paytm',      target: 'mule_004@paytm',           suspicious: true,  weight: 0.87 },
-    { source: 'wallet_0005@gpay',       target: 'mule_006@paytm',           suspicious: true,  weight: 0.76 },
-    { source: 'wallet_0136@bhim',       target: 'mule_008@paytm',           suspicious: false, weight: 0.42 },
-    { source: 'mule_004@paytm',         target: 'collector_001@crypto_eth', suspicious: true,  weight: 0.98 },
-    { source: 'mule_006@paytm',         target: 'collector_001@crypto_eth', suspicious: true,  weight: 0.87 },
-    { source: 'mule_008@paytm',         target: 'collector_001@crypto_eth', suspicious: true,  weight: 0.76 },
-    { source: 'wallet_0047@bhim',       target: 'collector_001@crypto_eth', suspicious: true,  weight: 0.71 },
-  ],
+  edges: MOCK_GRAPH_LINKS,
+  links: MOCK_GRAPH_LINKS,
   metadata: { totalNodes: 10, totalEdges: 8, suspiciousCount: 5 },
   summary: {
     top_illicit_ratio: 50,
@@ -485,14 +499,62 @@ const MOCK_GRAPH: GraphData = {
   }
 };
 
+/** Normalize API responses so the UI always has scored `edges` + risk-colored nodes. */
+function normalizeGraphData(data: GraphData | null | undefined): GraphData {
+  const base = data || MOCK_GRAPH;
+  const enriched = enrichGraphRisk(base);
+  const highCount = enriched.nodes.filter((n) => (n.suspicious_score || 0) >= 0.65).length;
+  const avg =
+    enriched.nodes.reduce((s, n) => s + (n.suspicious_score || 0), 0) /
+    Math.max(1, enriched.nodes.length);
+
+  return {
+    ...base,
+    nodes: enriched.nodes as GraphData['nodes'],
+    edges: enriched.edges as GraphData['edges'],
+    links: enriched.edges as GraphData['links'],
+    metadata: {
+      totalNodes: enriched.nodes.length,
+      totalEdges: enriched.edges.length,
+      suspiciousCount: highCount,
+    },
+    summary: {
+      ...(base.summary || {}),
+      top_illicit_ratio: Math.round((highCount / Math.max(1, enriched.nodes.length)) * 100),
+      fan_out_nodes: enriched.nodes.filter((n) => (n.degree?.out || 0) >= 3).length,
+      fan_in_nodes: enriched.nodes.filter((n) => (n.degree?.in || 0) >= 3).length,
+      avg_suspicious_score: Math.round(avg * 100) / 100,
+      model_confidence: avg > 0.6 ? 'high' : avg > 0.35 ? 'medium' : 'low',
+    },
+  };
+}
+
 export const graphApi = {
   getSuspiciousSubgraph: async (uploadId: string, _topK?: number, _hop?: number): Promise<GraphData> => {
-    const real = await tryFetch<GraphData>(`/graph/suspicious/${uploadId}`);
-    return real || MOCK_GRAPH;
+    // ML subgraph extraction can take well over the default 4s timeout
+    let real = await tryFetch<GraphData>(
+      `/graph/suspicious/${uploadId}?top_k=${_topK ?? 20}&hop=${_hop ?? 2}`,
+      {},
+      30000
+    );
+    // If subgraph has nodes but no edges, fall back to full graph so lines render
+    const edgeCount = (real?.edges?.length || real?.links?.length || 0);
+    if (real?.nodes?.length && edgeCount === 0) {
+      const full = await tryFetch<GraphData>(`/graph/${uploadId}`, {}, 30000);
+      if (full && (full.edges?.length || full.links?.length)) {
+        real = {
+          ...real,
+          edges: full.edges || full.links,
+          links: full.links || full.edges,
+          nodes: full.nodes?.length ? full.nodes : real.nodes,
+        };
+      }
+    }
+    return normalizeGraphData(real || MOCK_GRAPH);
   },
   getFullGraph: async (uploadId: string): Promise<GraphData> => {
-    const real = await tryFetch<GraphData>(`/graph/${uploadId}`);
-    return real || MOCK_GRAPH;
+    const real = await tryFetch<GraphData>(`/graph/${uploadId}`, {}, 30000);
+    return normalizeGraphData(real || MOCK_GRAPH);
   },
 };
 

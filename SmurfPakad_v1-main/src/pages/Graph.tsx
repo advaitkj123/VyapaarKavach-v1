@@ -1,16 +1,17 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Network, Upload as UploadIcon, RefreshCw, Loader2, AlertTriangle, Download, Boxes } from "lucide-react";
+import { Network, Upload as UploadIcon, RefreshCw, Loader2, AlertTriangle, Download, Boxes, ShieldAlert, Sparkles } from "lucide-react";
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import UltraGraphVisualization from "@/components/UltraGraphVisualization";
 import NetworkGraph3D from "@/components/NetworkGraph3D";
 import { graphApi, uploadApi, type GraphData } from "@/lib/api";
+import { enrichGraphRisk, type SmurfPattern } from "@/lib/graphRisk";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/components/ToastNotification";
-import { usePageEntrance } from "@/hooks/useGSAP";
+import { Badge } from "@/components/ui/badge";
 
 
 interface UploadItem {
@@ -22,55 +23,83 @@ interface UploadItem {
 }
 
 // Transform backend graph data to match UltraGraphVisualization expected format
-function transformGraphData(backendData: GraphData): GraphData {
+function transformGraphData(backendData: GraphData): any {
   if (!backendData) return backendData;
-  
+
+  const enriched = enrichGraphRisk(backendData);
+  const nodeCount = enriched.nodes.length;
+
+  const nodes = enriched.nodes.map((node: any, index: number) => {
+    const inDeg = node.degree?.in ?? 0;
+    const outDeg = node.degree?.out ?? 0;
+    const score = node.suspicious_score ?? 0;
+    const risk = String(node.risk_level || node.riskLevel || 'low').toLowerCase();
+    const timestamp =
+      typeof node.timestamp === 'number' && node.timestamp <= 1000
+        ? node.timestamp
+        : Math.min(100, Math.round((index / Math.max(1, nodeCount - 1)) * 100));
+
+    return {
+      ...node,
+      id: String(node.id ?? `node_${index}`),
+      label: node.label || node.id || `node_${index}`,
+      class: score >= 0.35 || risk === 'high' || risk === 'critical' || risk === 'medium' ? 'illicit' : 'licit',
+      top_k: node.top_k === true || score >= 0.65,
+      risk_level: risk === 'critical' ? 'high' : risk,
+      suspicious_score: score,
+      community: node.community ?? (score >= 0.65 ? 1 : score >= 0.35 ? 2 : 3),
+      degree: { in: inDeg, out: outDeg },
+      centrality: node.centrality ?? {
+        pagerank: Math.max(0.01, score * 0.2),
+        betweenness: Math.max(0.01, (inDeg + outDeg) / 20),
+        closeness: 0.5,
+        degree: inDeg + outDeg,
+      },
+      timestamp,
+    };
+  });
+
+  const nodeIds = new Set(nodes.map((n: any) => n.id));
+  const edges = enriched.edges
+    .map((edge: any, index: number) => ({
+      ...edge,
+      source: String(edge.source),
+      target: String(edge.target),
+      weight: edge.weight ?? 1,
+      high_risk: edge.high_risk === true,
+      flow: edge.flow ?? 'outgoing',
+      timestamp:
+        typeof edge.timestamp === 'number' && edge.timestamp <= 1000
+          ? edge.timestamp
+          : Math.min(100, Math.round(((index + 1) / Math.max(1, enriched.edges.length)) * 100)),
+    }))
+    .filter((e: any) => nodeIds.has(e.source) && nodeIds.has(e.target));
+
+  const highCount = nodes.filter((n: any) => n.suspicious_score >= 0.65).length;
+  const avg =
+    nodes.reduce((s: number, n: any) => s + (n.suspicious_score || 0), 0) / Math.max(1, nodes.length);
+
   return {
     ...backendData,
-    nodes: (backendData.nodes || []).map((node, index) => ({
-      ...node,
-      // Add label for display (use id as label if not present)
-      label: node.id || `node_${index}`,
-      // Add class based on predictedLabel or risk_level
-      class: node.predictedLabel === 'illicit' ? 'illicit' : 
-             node.risk_level === 'high' || node.riskLevel === 'high' ? 'illicit' : 
-             node.risk_level === 'medium' || node.riskLevel === 'medium' ? 'illicit' : 'licit',
-      // Mark seed nodes as top_k
-      top_k: node.isSeedNode === true,
-      // Ensure risk_level is lowercase
-      risk_level: (node.risk_level || node.riskLevel || 'low').toLowerCase(),
-      // Ensure suspicious_score is set
-      suspicious_score: node.suspicious_score || node.suspiciousScore || node.mlScore || 0,
-      // Add community (default to 1 if not present)
-      community: node.community ?? 1,
-      // Add placeholder centrality for visualization
-      centrality: node.centrality ?? {
-        pagerank: 0.01,
-        betweenness: 0.01,
-        closeness: 0.5,
-        degree: (node.degree?.in || 0) + (node.degree?.out || 0)
-      },
-      // Add timestamp if not present
-      timestamp: node.timestamp ?? Date.now() - Math.random() * 10000000000,
-    })),
-    edges: (backendData.edges || []).map(edge => ({
-      ...edge,
-      // Ensure weight is set
-      weight: edge.weight ?? 1,
-      // Ensure high_risk is set
-      high_risk: edge.high_risk ?? (edge.suspicious === true),
-      // Add flow direction
-      flow: edge.flow ?? 'outgoing',
-      timestamp: edge.timestamp ?? Date.now(),
-    })),
-    // Ensure summary exists
-    summary: backendData.summary ?? {
-      top_illicit_ratio: 0,
-      fan_out_nodes: 0,
-      fan_in_nodes: 0,
-      avg_suspicious_score: 0,
-      model_confidence: 'low'
-    }
+    nodes,
+    edges,
+    links: edges,
+    patterns: enriched.patterns,
+    meta: {
+      k: 20,
+      hop: 2,
+      total_nodes: nodes.length,
+      total_edges: edges.length,
+      generated_at: new Date().toISOString(),
+    },
+    summary: {
+      ...(backendData.summary || {}),
+      top_illicit_ratio: Math.round((highCount / Math.max(1, nodes.length)) * 100),
+      fan_out_nodes: nodes.filter((n: any) => n.degree.out >= 3).length,
+      fan_in_nodes: nodes.filter((n: any) => n.degree.in >= 3).length,
+      avg_suspicious_score: Math.round(avg * 100) / 100,
+      model_confidence: avg > 0.6 ? 'high' : avg > 0.35 ? 'medium' : 'low',
+    },
   };
 }
 
@@ -80,6 +109,7 @@ export default function Graph() {
   const uploadIdParam = searchParams.get('uploadId');
   
   const [graphData, setGraphData] = useState<GraphData | null>(null);
+  const [patterns, setPatterns] = useState<SmurfPattern[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useDemo, setUseDemo] = useState(true); // Default to demo mode
@@ -92,6 +122,18 @@ export default function Graph() {
   
   // Track if we've fetched uploads already
   const hasFetchedUploads = useRef(false);
+
+  const riskBreakdown = useMemo(() => {
+    const nodes = graphData?.nodes || [];
+    let high = 0, medium = 0, low = 0;
+    for (const n of nodes as any[]) {
+      const s = n.suspicious_score ?? n.risk ?? 0;
+      if (s >= 0.65) high++;
+      else if (s >= 0.35) medium++;
+      else low++;
+    }
+    return { high, medium, low, total: nodes.length, edges: (graphData?.edges || graphData?.links || []).length };
+  }, [graphData]);
 
   // Fetch available uploads on mount (only once)
   useEffect(() => {
@@ -129,7 +171,11 @@ export default function Graph() {
       // Transform backend data to match visualization component expectations
       const transformedData = transformGraphData(data);
       setGraphData(transformedData);
+      setPatterns(transformedData.patterns || []);
       setUseDemo(false);
+      toast.success(
+        `Analyzed ${transformedData.nodes.length} wallets · ${transformedData.edges.length} edges · ${(transformedData.patterns || []).length} smurf patterns`
+      );
     } catch (err: unknown) {
       console.error('Failed to fetch graph:', err);
       setError((err as Error).message || 'Failed to load graph data');
@@ -159,14 +205,16 @@ export default function Graph() {
       const text = await file.text();
       const jsonData = JSON.parse(text);
       
-      // Validate basic structure
-      if (!jsonData.nodes || !jsonData.edges) {
+      // Validate basic structure (accept edges or links)
+      if (!jsonData.nodes || (!jsonData.edges && !jsonData.links)) {
         throw new Error('Invalid graph data format');
       }
-      
-      setGraphData(jsonData);
+
+      const transformed = transformGraphData(jsonData);
+      setGraphData(transformed);
+      setPatterns(transformed.patterns || []);
       setUseDemo(false);
-      toast.success(`Successfully loaded ${jsonData.nodes.length} nodes and ${jsonData.edges.length} edges`);
+      toast.success(`Successfully loaded ${transformed.nodes.length} nodes and ${transformed.edges.length} edges`);
     } catch (error) {
       console.error('Error parsing file:', error);
       setError('Invalid JSON file. Please upload a valid graph data file.');
@@ -209,6 +257,7 @@ export default function Graph() {
                 variant="outline"
                 onClick={() => {
                   setGraphData(null);
+                  setPatterns([]);
                   setUseDemo(true);
                 }}
                 className="dark:border-gray-600 dark:text-gray-300"
@@ -348,6 +397,71 @@ export default function Graph() {
           </Card>
         )}
 
+        {/* Risk legend + Smurf Chain Hunter (hackathon demo panel) */}
+        {!isLoading && graphData && !useDemo && (
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="dark:bg-white/5 dark:border-crypto-purple/20 md:col-span-1">
+              <CardContent className="pt-6 space-y-3">
+                <div className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                  <Sparkles className="h-4 w-4 text-crypto-purple" />
+                  Risk breakdown
+                </div>
+                <div className="flex flex-wrap gap-2 text-sm">
+                  <Badge className="bg-red-500/20 text-red-400 border-red-500/40">
+                    High {riskBreakdown.high}
+                  </Badge>
+                  <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/40">
+                    Medium {riskBreakdown.medium}
+                  </Badge>
+                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/40">
+                    Low {riskBreakdown.low}
+                  </Badge>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {riskBreakdown.total} wallets · {riskBreakdown.edges} edges · scored with GATv2 + fan-in/fan-out heuristics
+                </p>
+                <div className="flex items-center gap-3 text-xs pt-1">
+                  <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" /> High ≥65%</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" /> Med ≥35%</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" /> Low</span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="dark:bg-white/5 dark:border-crypto-purple/20 md:col-span-2">
+              <CardContent className="pt-6 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                    <ShieldAlert className="h-4 w-4 text-red-400" />
+                    Smurf Chain Hunter
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {patterns.length} patterns
+                  </Badge>
+                </div>
+                {patterns.length === 0 ? (
+                  <p className="text-sm text-gray-500">No strong smurfing signatures in this subgraph. Try raising Top K or Hop.</p>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2 max-h-40 overflow-y-auto">
+                    {patterns.map((p) => (
+                      <div
+                        key={p.id}
+                        className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-white truncate">{p.walletId}</span>
+                          <Badge className="bg-red-500/15 text-red-300 shrink-0">{Math.round(p.score * 100)}%</Badge>
+                        </div>
+                        <div className="text-crypto-purple mt-0.5">{p.fatf} · {p.type.replace('_', ' ')}</div>
+                        <div className="text-gray-400 mt-0.5">{p.detail}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Interactive Graph Visualization — 2D / 3D Toggle */}
         {!isLoading && (
           <div className="space-y-3">
@@ -383,7 +497,38 @@ export default function Graph() {
               </ErrorBoundary>
             </div>
             <div id="view-3d" style={{ display: 'none' }} className="rounded-xl overflow-hidden border border-white/10">
-              <NetworkGraph3D height="520px" />
+              <NetworkGraph3D
+                height="520px"
+                nodes={
+                  graphData?.nodes?.length
+                    ? graphData.nodes.map((n: any, i: number) => ({
+                        id: String(n.id),
+                        position: [
+                          Math.cos((i / Math.max(1, graphData.nodes.length)) * Math.PI * 2) * (2 + (n.suspicious_score || 0) * 2),
+                          Math.sin(i * 1.7) * 1.5,
+                          Math.sin((i / Math.max(1, graphData.nodes.length)) * Math.PI * 2) * (2 + (n.suspicious_score || 0) * 2),
+                        ] as [number, number, number],
+                        riskScore: n.suspicious_score || n.risk || 0,
+                        platform: (String(n.id).includes('phonepe')
+                          ? 'phonepe'
+                          : String(n.id).includes('gpay')
+                            ? 'gpay'
+                            : String(n.id).includes('paytm')
+                              ? 'paytm'
+                              : 'bank') as 'paytm' | 'phonepe' | 'gpay' | 'bank',
+                      }))
+                    : undefined
+                }
+                edges={
+                  graphData?.nodes?.length
+                    ? (graphData.edges || graphData.links || []).map((e: any) => ({
+                        from: String(e.source?.id ?? e.source ?? e.from),
+                        to: String(e.target?.id ?? e.target ?? e.to),
+                        amount: e.weight ?? e.amount ?? 1,
+                      }))
+                    : undefined
+                }
+              />
             </div>
           </div>
         )}

@@ -12,7 +12,7 @@ import {
   TrendingUp, Target, Layers, GitBranch,
   Shield, Sparkles, Wifi, Cpu
 } from 'lucide-react';
-import { useWebSocket } from '@/lib/api';
+import { useWebSocket, graphApi } from '@/lib/api';
 import { toast } from '@/components/ToastNotification';
 import { Navigate } from 'react-router-dom';
 
@@ -177,13 +177,87 @@ export default function LiveAnalysisPanel({ uploadId, onComplete }: LiveAnalysis
           });
         }
         if (stage === 'subgraph_extraction' && msg.data.subgraph_ready) {
-          setGraphData(demoData);
+          // Prefer real subgraph from API; fall back to demo while loading
+          graphApi.getSuspiciousSubgraph(uploadId).then((g) => {
+            const edges = (g.edges || g.links || []).map((e: any) => ({
+              source: String(e.source?.id ?? e.source ?? e.from),
+              target: String(e.target?.id ?? e.target ?? e.to),
+              weight: e.weight ?? 1,
+              high_risk: e.high_risk ?? e.suspicious === true,
+              flow: e.flow ?? 'outgoing',
+              timestamp: typeof e.timestamp === 'number' && e.timestamp <= 1000 ? e.timestamp : undefined,
+            })).filter((e) => e.source && e.target);
+
+            if (g.nodes?.length && edges.length) {
+              setGraphData({
+                meta: {
+                  k: 20,
+                  hop: 2,
+                  total_nodes: g.nodes.length,
+                  total_edges: edges.length,
+                  generated_at: new Date().toISOString(),
+                },
+                nodes: g.nodes.map((n: any, i: number) => ({
+                  id: String(n.id),
+                  label: n.label || String(n.id),
+                  suspicious_score: n.suspicious_score ?? n.suspiciousScore ?? n.risk ?? 0,
+                  risk_level: String(n.risk_level || n.riskLevel || 'low').toLowerCase(),
+                  class: (n.risk_level || n.riskLevel) === 'high' || (n.risk_level || n.riskLevel) === 'critical' ? 'illicit' : 'licit',
+                  top_k: n.isSeedNode === true || n.top_k === true,
+                  degree: { in: n.degree?.in ?? 0, out: n.degree?.out ?? 0 },
+                  timestamp: Math.min(100, Math.round((i / Math.max(1, g.nodes.length - 1)) * 100)),
+                  community: n.community ?? 1,
+                })),
+                edges,
+                summary: g.summary || demoData.summary,
+              });
+              setNodeCount(g.nodes.length);
+              setEdgeCount(edges.length);
+            } else {
+              setGraphData(demoData);
+            }
+          }).catch(() => setGraphData(demoData));
         }
         if (stage === 'complete') {
           setIsComplete(true);
           if (msg.data) setSubgraphStats(msg.data);
           toast.success(`Analysis complete! ${msg.data.patterns} patterns, ${msg.data.suspicious_addresses} flagged`);
           onComplete?.(msg.data);
+          // Ensure edges are loaded even if subgraph_extraction stage was skipped
+          graphApi.getSuspiciousSubgraph(uploadId).then((g) => {
+            const edges = (g.edges || g.links || []).map((e: any) => ({
+              source: String(e.source?.id ?? e.source ?? e.from),
+              target: String(e.target?.id ?? e.target ?? e.to),
+              weight: e.weight ?? 1,
+              high_risk: e.high_risk ?? e.suspicious === true,
+              flow: e.flow ?? 'outgoing',
+            })).filter((e) => e.source && e.target);
+            if (g.nodes?.length && edges.length) {
+              setGraphData({
+                meta: {
+                  k: 20, hop: 2,
+                  total_nodes: g.nodes.length,
+                  total_edges: edges.length,
+                  generated_at: new Date().toISOString(),
+                },
+                nodes: g.nodes.map((n: any, i: number) => ({
+                  id: String(n.id),
+                  label: n.label || String(n.id),
+                  suspicious_score: n.suspicious_score ?? n.suspiciousScore ?? n.risk ?? 0,
+                  risk_level: String(n.risk_level || n.riskLevel || 'low').toLowerCase(),
+                  class: (n.risk_level || n.riskLevel) === 'high' || (n.risk_level || n.riskLevel) === 'critical' ? 'illicit' : 'licit',
+                  top_k: n.isSeedNode === true || n.top_k === true,
+                  degree: { in: n.degree?.in ?? 0, out: n.degree?.out ?? 0 },
+                  timestamp: Math.min(100, Math.round((i / Math.max(1, g.nodes.length - 1)) * 100)),
+                  community: n.community ?? 1,
+                })),
+                edges,
+                summary: g.summary || demoData.summary,
+              });
+              setNodeCount(g.nodes.length);
+              setEdgeCount(edges.length);
+            }
+          }).catch(() => { /* keep existing graph */ });
         }
       }
     }
@@ -283,9 +357,16 @@ export default function LiveAnalysisPanel({ uploadId, onComplete }: LiveAnalysis
 
   const forceGraphData = useMemo(() => {
     if (!graphData) return { nodes: [], links: [] };
+    const nodeIds = new Set(graphData.nodes.map((n) => n.id));
     return {
       nodes: graphData.nodes.map(node => ({ ...node, val: getNodeVal(node) })),
-      links: graphData.edges.map(edge => ({ ...edge })),
+      links: (graphData.edges || [])
+        .map((edge) => ({
+          ...edge,
+          source: String(typeof edge.source === 'object' ? (edge.source as any).id : edge.source),
+          target: String(typeof edge.target === 'object' ? (edge.target as any).id : edge.target),
+        }))
+        .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target)),
     };
   }, [graphData, getNodeVal]);
 

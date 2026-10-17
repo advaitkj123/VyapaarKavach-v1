@@ -122,10 +122,10 @@ function Scene({ nodes, edges }: { nodes: Node3D[]; edges: Edge3D[] }) {
         <NodeMesh key={node.id} node={node} />
       ))}
       {edges.map((edge, i) => (
-        <>
-          <EdgeLine key={`line-${i}`} from={edge.from} to={edge.to} nodes={nodes} />
-          <AnimatedEdge key={`anim-${i}`} from={edge.from} to={edge.to} nodes={nodes} />
-        </>
+        <group key={`edge-${i}`}>
+          <EdgeLine from={edge.from} to={edge.to} nodes={nodes} />
+          <AnimatedEdge from={edge.from} to={edge.to} nodes={nodes} />
+        </group>
       ))}
       <OrbitControls autoRotate autoRotateSpeed={0.5} enableZoom={true} enablePan={false} />
       <fog attach="fog" args={["#050510", 8, 20]} />

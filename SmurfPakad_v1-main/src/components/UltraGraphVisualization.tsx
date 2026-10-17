@@ -14,15 +14,16 @@ import { ScrollArea } from './ui/scroll-area';
 import { ErrorBoundary } from './ErrorBoundary';
 import { ZoomIn, ZoomOut, Maximize2, Info, Search, Download, TrendingUp, Route, Camera, Play, Pause, Box, AlertTriangle, Network, BarChart3, Bookmark, Layers, GitBranch, X } from 'lucide-react';
 import { toast } from './ToastNotification';
+import { riskColor, enrichGraphRisk } from '@/lib/graphRisk';
 
 interface GraphNode {
   id: string;
-  label: string;
+  label?: string;
   suspicious_score: number;
   risk_level: string;
   class: string;
   top_k: boolean;
-  degree: {
+  degree?: {
     in: number;
     out: number;
   };
@@ -46,7 +47,7 @@ interface GraphEdge {
 }
 
 interface GraphData {
-  meta: {
+  meta?: {
     k: number;
     hop: number;
     total_nodes: number;
@@ -54,8 +55,9 @@ interface GraphData {
     generated_at: string;
   };
   nodes: GraphNode[];
-  edges: GraphEdge[];
-  summary: {
+  edges?: GraphEdge[];
+  links?: GraphEdge[];
+  summary?: {
     top_illicit_ratio: number;
     fan_out_nodes: number;
     fan_in_nodes: number;
@@ -179,17 +181,83 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
     }
   });
 
-  // Use provided data or stable demo data reference, normalizing field names
+  // Use provided data or stable demo data reference; enrich risk from structure + scores
   const graphData = useMemo(() => {
     const source = data || demoDataRef.current;
+    const enriched = enrichGraphRisk(source);
+
+    const nodes = enriched.nodes.map((n: RawNode, index: number) => {
+      const scoreRaw = n.suspicious_score ?? n.suspiciousScore ?? n.risk ?? 0;
+      const score = scoreRaw > 1 ? scoreRaw / 100 : scoreRaw;
+      const risk = String(n.risk_level || n.riskLevel || 'low').toLowerCase();
+      const inDeg = n.degree?.in ?? 0;
+      const outDeg = n.degree?.out ?? 0;
+      const ts = n.timestamp;
+      const timestamp =
+        typeof ts === 'number' && ts <= 1000
+          ? ts
+          : Math.min(100, Math.round((index / Math.max(1, (enriched.nodes.length || 1) - 1)) * 100));
+
+      const level =
+        risk === 'critical' || risk === 'high'
+          ? 'high'
+          : risk === 'medium'
+            ? 'medium'
+            : score >= 0.65
+              ? 'high'
+              : score >= 0.35
+                ? 'medium'
+                : 'low';
+
+      return {
+        ...n,
+        id: String(n.id ?? `node_${index}`),
+        label: n.label || String(n.id ?? `node_${index}`),
+        risk_level: level,
+        suspicious_score: score,
+        degree: { in: inDeg, out: outDeg },
+        class: score >= 0.35 || level !== 'low' ? 'illicit' : 'licit',
+        top_k: n.top_k ?? score >= 0.65,
+        community: n.community ?? (score >= 0.65 ? 1 : score >= 0.35 ? 2 : 3),
+        timestamp,
+      } as GraphNode;
+    });
+
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const edges = enriched.edges
+      .map((e: any, index: number) => {
+        const sourceId = String(e?.source?.id ?? e?.source ?? e?.from ?? '');
+        const targetId = String(e?.target?.id ?? e?.target ?? e?.to ?? '');
+        const ts = e?.timestamp;
+        const timestamp =
+          typeof ts === 'number' && ts <= 1000
+            ? ts
+            : Math.min(100, Math.round(((index + 1) / Math.max(1, enriched.edges.length)) * 100));
+
+        return {
+          ...e,
+          source: sourceId,
+          target: targetId,
+          weight: e?.weight ?? e?.value ?? 1,
+          high_risk: e?.high_risk ?? e?.suspicious === true,
+          flow: e?.flow ?? 'outgoing',
+          timestamp,
+        } as GraphEdge;
+      })
+      .filter((e) => e.source && e.target && nodeIds.has(e.source) && nodeIds.has(e.target));
+
     return {
       ...source,
-      nodes: (source.nodes || []).map((n: RawNode) => ({
-        ...n,
-        risk_level: (n.risk_level || n.riskLevel || 'low').toLowerCase(),
-        suspicious_score: n.suspicious_score || n.suspiciousScore || n.risk || 0,
-      })),
-      edges: source.edges || [],
+      nodes,
+      edges,
+      summary: source.summary ?? demoDataRef.current.summary,
+      meta: source.meta ?? {
+        k: 20,
+        hop: 2,
+        total_nodes: nodes.length,
+        total_edges: edges.length,
+        generated_at: new Date().toISOString(),
+      },
     };
   }, [data]);
 
@@ -418,9 +486,8 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
       return communityColors[node.community as keyof typeof communityColors] || '#999';
     }
 
-    if (node.risk_level === 'high') return '#ef4444';
-    if (node.risk_level === 'medium') return '#f59e0b';
-    return '#10b981';
+    // Score-first coloring so real analysis never renders as "all green"
+    return riskColor(node.suspicious_score ?? node.risk_level ?? 0);
   }, [centralityMode, showCommunities, tracingAllPaths]);
 
   const getLinkColor = useCallback((link: GraphEdge) => {
@@ -793,9 +860,14 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
   const forceGraphData = useMemo(() => ({
     nodes: filteredNodes.map(node => ({
       ...node,
-      val: Math.max(1, Math.log2(node.degree.in + node.degree.out + 1)) // Logarithmic scaling
+      val: Math.max(1, Math.log2((node.degree?.in || 0) + (node.degree?.out || 0) + 1))
     })),
-    links: (filteredEdges || []).map(edge => ({ ...edge }))
+    // ForceGraph requires `links` with string source/target that match node ids
+    links: (filteredEdges || []).map(edge => ({
+      ...edge,
+      source: typeof edge.source === 'object' ? (edge.source as GraphNode).id : String(edge.source),
+      target: typeof edge.target === 'object' ? (edge.target as GraphNode).id : String(edge.target),
+    }))
   }), [filteredNodes, filteredEdges]);
 
   // Particle function
@@ -808,8 +880,8 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
     if (tracedEdges.has(edgeKey)) return 6;
 
     const isInPath = highlightedPath.length > 0 &&
-      highlightedPath.includes(link.source.id || link.source) &&
-      highlightedPath.includes(link.target.id || link.target);
+      highlightedPath.includes(String(sourceId)) &&
+      highlightedPath.includes(String(targetId));
     return isInPath ? 4 : (link.high_risk ? 2 : 0);
   }, [highlightedPath, tracedEdges]);
 
@@ -826,8 +898,8 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
   const getNodeLabel = useCallback((node: SimulationNode) => `
       ID: ${node.id}
       Risk: ${node.risk_level}
-      Score: ${(node.suspicious_score * 100).toFixed(2)}%
-      In: ${node.degree.in} | Out: ${node.degree.out}
+      Score: ${((node.suspicious_score || 0) * 100).toFixed(2)}%
+      In: ${node.degree?.in || 0} | Out: ${node.degree?.out || 0}
       ${node.community ? `Community: ${node.community}` : ''}
       ${node.centrality?.pagerank ? `PageRank: ${node.centrality.pagerank.toFixed(3)}` : ''}
   `, []);
@@ -1048,7 +1120,7 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
           <TabsContent value="analytics" className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="p-4">
-                <div className="text-2xl font-bold text-blue-600">{graphData.summary.top_illicit_ratio}%</div>
+                <div className="text-2xl font-bold text-blue-600">{graphData.summary?.top_illicit_ratio ?? 0}%</div>
                 <div className="text-xs text-muted-foreground">Illicit Ratio</div>
               </Card>
               <Card className="p-4">
@@ -1060,7 +1132,7 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
                 <div className="text-xs text-muted-foreground">Alerts</div>
               </Card>
               <Card className="p-4">
-                <div className="text-2xl font-bold text-orange-600">{graphData.summary.model_confidence}</div>
+                <div className="text-2xl font-bold text-orange-600">{graphData.summary?.model_confidence ?? '—'}</div>
                 <div className="text-xs text-muted-foreground">Confidence</div>
               </Card>
             </div>
@@ -1385,11 +1457,11 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Incoming</div>
-              <div className="font-semibold">{selectedNode.degree.in}</div>
+              <div className="font-semibold">{selectedNode.degree?.in ?? 0}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Outgoing</div>
-              <div className="font-semibold">{selectedNode.degree.out}</div>
+              <div className="font-semibold">{selectedNode.degree?.out ?? 0}</div>
             </div>
             {selectedNode.community && (
               <div>
