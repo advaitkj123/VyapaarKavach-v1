@@ -381,45 +381,14 @@ export default function LiveThreatMap() {
 
   // WebSocket / demo live alerts
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
+    let liveInterval: ReturnType<typeof setInterval> | null = null;
+    let demoStarted = false;
 
-    if (token) {
-      // ── Real WebSocket path ──────────────────────────────────────────────
-      const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-      const wsUrl = apiBase.replace("http", "ws");
-      const ws = new WebSocket(`${wsUrl}/ws?token=${token}`);
-
-      ws.onopen = () => {
-        setWsConnected(true);
-        ws.send(JSON.stringify({ type: "subscribe", resourceId: "safeguard" }));
-      };
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === "safeguard_alert" && msg.data) {
-            setAlerts((prev) => [msg.data, ...prev].slice(0, 50));
-            safeguardApi.getStats().then((d) => setStats({
-              totalChecks:       Number(d?.totalChecks       ?? 0) || 0,
-              totalFlagged:      Number(d?.totalFlagged      ?? 0) || 0,
-              flaggedRecipients: Number(d?.flaggedRecipients ?? 0) || 0,
-              flagRate:          Number(d?.flagRate          ?? 0) || 0,
-            })).catch(() => {});
-          }
-        } catch { /* ignore */ }
-      };
-      ws.onclose = () => setWsConnected(false);
-      ws.onerror = () => {
-        setWsConnected(false);
-        // Fallback to demo mode if connection fails
-        startDemoMode();
-      };
-      wsRef.current = ws;
-      return () => { ws.close(); };
-    }
-
-    // ── Demo mode — simulate live alerts without backend auth ────────────
+    // Define first — avoids TDZ "Cannot access before initialization" on ws.onerror
     const startDemoMode = () => {
-      setWsConnected(true); // show LIVE in demo
+      if (demoStarted) return;
+      demoStarted = true;
+      setWsConnected(true);
 
       const MOCK_ALERTS: SafeguardAlert[] = [
         { id: "a1",  severity: "critical", riskLevel: "critical", walletId: "mule_004@paytm",           message: "Critical: Smurfing cluster detected — ₹9,800 x14 to collector_001",    timestamp: new Date().toISOString() },
@@ -431,38 +400,88 @@ export default function LiveThreatMap() {
         { id: "a7",  severity: "high",     riskLevel: "high",     walletId: "mule_008@paytm",            message: "High: FATF TR-05 triggered — threshold proximity ratio 0.96",          timestamp: new Date(Date.now()-400000).toISOString() },
       ];
 
-      // Show existing alerts immediately
       setAlerts(MOCK_ALERTS);
 
-      // Inject new random alert every 8s
       let alertIdx = 0;
       const LIVE_ALERT_POOL: SafeguardAlert[] = [
-        { id: "l1", severity: "critical", riskLevel: "critical", walletId: "dark_wallet@crypto_btc",  message: "🔴 LIVE: New critical wallet flagged — GNN score 96%",                timestamp: "" },
-        { id: "l2", severity: "high",     riskLevel: "high",     walletId: "rapid_mule_9@phonepe",    message: "🟠 LIVE: Rapid transfer pattern — 5 hops in 3 minutes",               timestamp: "" },
-        { id: "l3", severity: "medium",   riskLevel: "medium",   walletId: "structured_x@gpay",       message: "🟡 LIVE: Structuring alert — 6 sub-threshold payments detected",       timestamp: "" },
-        { id: "l4", severity: "critical", riskLevel: "critical", walletId: "mixer_exit_7@crypto_eth", message: "🔴 LIVE: Crypto mixer exit detected — cross-chain bridge activity",    timestamp: "" },
+        { id: "l1", severity: "critical", riskLevel: "critical", walletId: "dark_wallet@crypto_btc",  message: "LIVE: New critical wallet flagged — GNN score 96%",                timestamp: "" },
+        { id: "l2", severity: "high",     riskLevel: "high",     walletId: "rapid_mule_9@phonepe",    message: "LIVE: Rapid transfer pattern — 5 hops in 3 minutes",               timestamp: "" },
+        { id: "l3", severity: "medium",   riskLevel: "medium",   walletId: "structured_x@gpay",       message: "LIVE: Structuring alert — 6 sub-threshold payments detected",       timestamp: "" },
+        { id: "l4", severity: "critical", riskLevel: "critical", walletId: "mixer_exit_7@crypto_eth", message: "LIVE: Crypto mixer exit detected — cross-chain bridge activity",    timestamp: "" },
       ];
 
-      const liveInterval = setInterval(() => {
+      liveInterval = setInterval(() => {
         const base = LIVE_ALERT_POOL[alertIdx % LIVE_ALERT_POOL.length];
         const newAlert: SafeguardAlert = { ...base, id: `live_${Date.now()}`, timestamp: new Date().toISOString() };
-        setAlerts(prev => [newAlert, ...prev].slice(0, 50));
-        setStats(prev => ({
+        setAlerts((prev) => [newAlert, ...prev].slice(0, 50));
+        setStats((prev) => ({
           ...prev,
           totalChecks:  prev.totalChecks + Math.floor(Math.random() * 4 + 1),
           totalFlagged: prev.totalFlagged + (base.severity === "critical" ? 1 : 0),
           flaggedRecipients: prev.flaggedRecipients + (base.severity !== "medium" ? 1 : 0),
-          flagRate: parseFloat(((prev.totalFlagged + 1) / (prev.totalChecks + 5) * 100).toFixed(2)),
+          flagRate: parseFloat((((prev.totalFlagged + 1) / (prev.totalChecks + 5)) * 100).toFixed(2)),
         }));
         alertIdx++;
       }, 8000);
-
-      return () => { clearInterval(liveInterval); };
     };
 
-    if (!localStorage.getItem("auth_token")) {
-      return startDemoMode();
+    const token = localStorage.getItem("authToken") || localStorage.getItem("auth_token");
+
+    if (!token) {
+      startDemoMode();
+      return () => {
+        if (liveInterval) clearInterval(liveInterval);
+      };
     }
+
+    // ── Real WebSocket path (falls back to demo on error) ────────────────
+    const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+    const wsUrl = apiBase.replace("http", "ws");
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(`${wsUrl}/ws?token=${token}`);
+    } catch {
+      startDemoMode();
+      return () => {
+        if (liveInterval) clearInterval(liveInterval);
+      };
+    }
+
+    ws.onopen = () => {
+      setWsConnected(true);
+      try {
+        ws.send(JSON.stringify({ type: "subscribe", resourceId: "safeguard" }));
+      } catch { /* ignore */ }
+    };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "safeguard_alert" && msg.data) {
+          setAlerts((prev) => [msg.data, ...prev].slice(0, 50));
+          safeguardApi.getStats().then((d) => setStats({
+            totalChecks:       Number(d?.totalChecks       ?? 0) || 0,
+            totalFlagged:      Number(d?.totalFlagged      ?? 0) || 0,
+            flaggedRecipients: Number(d?.flaggedRecipients ?? 0) || 0,
+            flagRate:          Number(d?.flagRate          ?? 0) || 0,
+          })).catch(() => {});
+        }
+      } catch { /* ignore */ }
+    };
+    ws.onclose = () => {
+      setWsConnected(false);
+      startDemoMode();
+    };
+    ws.onerror = () => {
+      setWsConnected(false);
+      try { ws.close(); } catch { /* ignore */ }
+      startDemoMode();
+    };
+    wsRef.current = ws;
+
+    return () => {
+      try { ws.close(); } catch { /* ignore */ }
+      if (liveInterval) clearInterval(liveInterval);
+    };
   }, []);
 
   const criticalCount = alerts.filter(

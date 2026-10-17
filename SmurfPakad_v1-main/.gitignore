@@ -1,7 +1,17 @@
-# Environment
+# Environment / secrets — NEVER commit API keys
 .env
+.env.*
+!.env.example
+!**/.env.example
 .env.local
 .env.*.local
+**/.env
+**/secrets/
+*.pem
+*.key
+!vite.config.ts
+credentials.json
+service-account*.json
 venv/
 env/
 .venv/

@@ -21,7 +21,8 @@ import {
   GitBranch,
   Target,
   Grid3X3,
-  BookOpen
+  BookOpen,
+  Radar
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -43,6 +44,7 @@ const navigation = [
   { name: "Upload Data", href: "/cryptoflow/upload", icon: Upload },
   { name: "Analysis Results", href: "/cryptoflow/analysis", icon: BarChart3 },
   { name: "Transaction Graph", href: "/cryptoflow/graph", icon: Network },
+  { name: "VIGILANT", href: "/cryptoflow/vigilant", icon: Radar },
   { name: "Heatmap", href: "/cryptoflow/heatmap", icon: Grid3X3 },
   { name: "Patterns", href: "/cryptoflow/patterns", icon: GitBranch },
   { name: "Benchmarks", href: "/cryptoflow/benchmarks", icon: Target },

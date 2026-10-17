@@ -581,7 +581,7 @@ export const reportsApi = {
 
   downloadReport: async (_reportId: string): Promise<Blob> => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
       const res = await fetch(`${API_V1}/reports/${_reportId}/download`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (res.ok) return res.blob();
     } catch { /* mock */ }
@@ -718,8 +718,41 @@ export const safeguardApi = {
   checkTransaction: async (data: any) => {
     const real = await tryFetch<any>('/safeguard/check', { method: 'POST', body: JSON.stringify(data) });
     if (real) return real;
-    const riskScore = Math.random() * 0.4 + 0.1;
-    return { riskScore, riskLevel: riskScore > 0.7 ? 'high' : riskScore > 0.4 ? 'medium' : 'low', reasons: ['Velocity check passed'], message: 'Transaction assessed', checkedAt: new Date().toISOString() };
+
+    // Demo-friendly scoring so Live Safeguard is impressive on stage
+    const amount = Number(data?.amount) || 0;
+    const sender = String(data?.senderId || data?.sender_id || '').toLowerCase();
+    const recipient = String(data?.recipient || '').toLowerCase();
+    const reasons: string[] = [];
+    let riskScore = 0.15;
+
+    const isHighSender = /mule|collector|shell|mixer|dark|suspicious/.test(sender);
+    const isCryptoRail = /crypto|btc|eth|0x/.test(recipient);
+    const isStructuring = amount > 0 && amount < 100000;
+
+    if (isHighSender) {
+      riskScore += 0.35;
+      reasons.push('Sender matches high-risk / mule naming pattern');
+    }
+    if (isStructuring) {
+      riskScore += 0.3;
+      reasons.push(`Sub-threshold amount ₹${amount.toLocaleString('en-IN')} (structuring band)`);
+    }
+    if (isCryptoRail) {
+      riskScore += 0.25;
+      reasons.push('Cross-rail destination: UPI/fiat → crypto collector');
+    }
+    if (!reasons.length) reasons.push('Velocity check passed');
+
+    riskScore = Math.min(0.98, riskScore + Math.random() * 0.05);
+    const riskLevel = riskScore >= 0.75 ? 'critical' : riskScore >= 0.55 ? 'high' : riskScore >= 0.35 ? 'medium' : 'low';
+    return {
+      riskScore,
+      riskLevel,
+      reasons,
+      message: riskScore >= 0.55 ? 'BLOCK recommended' : 'Transaction assessed',
+      checkedAt: new Date().toISOString(),
+    };
   },
 
   getStats: async () => {
@@ -786,11 +819,25 @@ export const agentApi = {
     return makeMockInvestigation(walletId);
   },
 
-  chat: async (message: string, walletId?: string, _context?: any): Promise<{ message: string; report?: InvestigationReport }> => {
-    const real = await tryFetch<any>('/agent/chat', { method: 'POST', body: JSON.stringify({ message, wallet_id: walletId, context: _context }) }, 6000);
-    if (real) return { message: real.response || real.message || 'Understood.', report: real.report };
-    await new Promise(r => setTimeout(r, 500));
-    return { message: 'SmurfPakad Agent: I can investigate specific wallets or explain AML patterns. Try saying "investigate mule_wallet_x@paytm" or ask about smurfing detection methodology.' };
+  chat: async (message: string, walletId?: string, _context?: any): Promise<{ message: string; report?: InvestigationReport; poweredBy?: string }> => {
+    // LLM chat can take longer than the default 4s mock-fallback timeout
+    const real = await tryFetch<any>(
+      '/agent/chat',
+      { method: 'POST', body: JSON.stringify({ message, wallet_id: walletId, context: _context }) },
+      45000
+    );
+    if (real) {
+      return {
+        message: real.response || real.message || 'Understood.',
+        report: real.report,
+        poweredBy: real.poweredBy,
+      };
+    }
+    await new Promise((r) => setTimeout(r, 400));
+    return {
+      message:
+        'SmurfPakad Agent (offline fallback): I can investigate wallets or explain AML / VIGILANT patterns. Start the backend and set IBM_WATSONX_API_KEY (and PROJECT_ID) or GROQ_API_KEY in Backend/.env. Try: "investigate mule_wallet_x@paytm".',
+    };
   },
 
   getHistory: async () => {
@@ -835,7 +882,7 @@ export function useWebSocket(onMessage?: (msg: WSMessage) => void) {
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
     if (!token) return;
 
     const wsUrl = API_BASE.replace('http', 'ws');

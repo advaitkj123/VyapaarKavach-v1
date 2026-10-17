@@ -114,26 +114,32 @@ async def agent_chat(request: ChatRequest):
                 "report": report,
             }
     
-    # General chat — use IBM watsonx.ai or local response
-    if ibm_watsonx_service.is_configured:
-        try:
-            prompt = f"""You are the SmurfPakad AML Investigation Assistant. 
-You help compliance officers detect money laundering in blockchain and UPI payment networks.
-You have access to GNN (Graph Neural Network) models, FATF Red Flag indicators, and cross-platform analysis.
+    # General chat — LLM fallback chain (watsonx → Groq → Gemini → local)
+    prompt = f"""You are the SmurfPakad / VIGILANT AML Investigation Assistant.
+You help compliance officers detect money laundering in UPI/crypto networks and
+suspicious order-flow patterns in electronic markets.
+You have access to GNN models, FATF Red Flag indicators, path-signature / Hawkes
+screening concepts, and cross-platform analysis.
+
+Rules:
+- Do not invent event IDs, transaction hashes, or claim confirmed financial crime.
+- Distinguish alerts / patterns from proven misconduct.
+- Be concise and actionable for an analyst.
 
 User question: {request.message}
 
-Provide a helpful, accurate, and concise response. If the user asks about a specific wallet, suggest they use the /investigate endpoint."""
-            
-            response = await ibm_watsonx_service._call_watsonx(prompt, max_tokens=500)
-            return {
-                "type": "chat",
-                "message": response,
-                "poweredBy": "IBM watsonx.ai Granite 3.3",
-            }
-        except Exception:
-            pass
-    
+Provide a helpful, accurate response. If they name a wallet, suggest investigating it."""
+
+    try:
+        text, model_used = await ibm_watsonx_service._call_with_fallback(prompt, max_tokens=700)
+        return {
+            "type": "chat",
+            "message": text,
+            "poweredBy": model_used,
+        }
+    except Exception:
+        pass
+
     # Local fallback
     return {
         "type": "chat",
@@ -142,9 +148,10 @@ Provide a helpful, accurate, and concise response. If the user asks about a spec
             "and detect money laundering patterns. Try:\n\n"
             "• \"Investigate wallet mule_wallet_x@paytm\"\n"
             "• \"Scan 0x7f3a... for smurfing patterns\"\n"
-            "• \"What FATF indicators apply to Fan-Out patterns?\"\n\n"
-            "Provide a wallet ID and I'll run a full autonomous investigation using "
-            "GNN scoring, pattern detection, FATF mapping, and IBM watsonx.ai analysis."
+            "• \"What FATF indicators apply to Fan-Out patterns?\"\n"
+            "• \"Explain VIGILANT path signatures vs Hawkes features\"\n\n"
+            "Provide a wallet ID and I'll run a full autonomous investigation. "
+            "(Configure IBM_WATSONX_API_KEY + PROJECT_ID, or GROQ_API_KEY / GEMINI_API_KEY in Backend/.env for live LLM replies.)"
         ),
         "poweredBy": "SmurfPakad Local Engine",
     }

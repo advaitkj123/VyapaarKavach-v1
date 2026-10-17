@@ -68,6 +68,8 @@ interface GraphData {
 
 interface UltraGraphProps {
   data?: GraphData;
+  /** Fired when user selects a node — parent can open Explain / SAR / Safeguard */
+  onNodeSelect?: (node: GraphNode | null) => void;
 }
 
 interface Snapshot {
@@ -122,7 +124,7 @@ type RawNode = GraphNode & {
   risk?: number;
 };
 
-const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
+const UltraGraphVisualization = ({ data, onNodeSelect }: UltraGraphProps) => {
   const graphRef = useRef<ForceGraph2DInstance | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -490,6 +492,18 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
     return riskColor(node.suspicious_score ?? node.risk_level ?? 0);
   }, [centralityMode, showCommunities, tracingAllPaths]);
 
+  const platformOf = useCallback((id: string | undefined) => {
+    if (!id) return 'unknown';
+    const s = id.toLowerCase();
+    if (s.includes('paytm')) return 'paytm';
+    if (s.includes('phonepe')) return 'phonepe';
+    if (s.includes('gpay') || s.includes('google')) return 'gpay';
+    if (s.includes('bhim')) return 'bhim';
+    if (s.includes('crypto') || s.includes('btc') || s.includes('eth') || s.startsWith('0x')) return 'crypto';
+    if (s.includes('@')) return s.split('@')[1] || 'upi';
+    return 'unknown';
+  }, []);
+
   const getLinkColor = useCallback((link: GraphEdge) => {
     const sourceId = typeof link.source === 'object' ? (link.source as GraphNode)?.id : link.source;
     const targetId = typeof link.target === 'object' ? (link.target as GraphNode)?.id : link.target;
@@ -507,8 +521,16 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
         }
       }
     }
+
+    // Cross-platform hops (Paytm→PhonePe→crypto) — dashed visual via brighter pink
+    const sp = platformOf(sourceId);
+    const tp = platformOf(targetId);
+    if (sp !== 'unknown' && tp !== 'unknown' && sp !== tp) {
+      return '#f472b6'; // pink = cross-rail laundering hop
+    }
+
     return link.high_risk ? '#ef4444' : '#94a3b8';
-  }, [highlightedPath, tracedEdges]);
+  }, [highlightedPath, tracedEdges, platformOf]);
 
   const getLinkWidth = useCallback((link: GraphEdge) => {
     const sourceId = typeof link.source === 'object' ? (link.source as GraphNode)?.id : link.source;
@@ -518,8 +540,12 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
     // Wider for traced edges
     if (tracedEdges.has(edgeKey)) return 4;
 
+    const sp = platformOf(sourceId);
+    const tp = platformOf(targetId);
+    if (sp !== 'unknown' && tp !== 'unknown' && sp !== tp) return 3;
+
     return link.high_risk ? 2 : 1;
-  }, [tracedEdges]);
+  }, [tracedEdges, platformOf]);
 
   // Container dimensions
   useEffect(() => {
@@ -718,6 +744,7 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
 
   const handleNodeClick = useCallback((node: SimulationNode, event?: MouseEvent) => {
     setSelectedNode(node);
+    onNodeSelect?.(node);
 
     if (pathStart === null && !tracingAllPaths) {
       // Show context menu with options
@@ -744,7 +771,7 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
         setNodeMenuPosition({ x: event.clientX, y: event.clientY });
       }
     }
-  }, [pathStart, findShortestPath, tracingAllPaths, clearPathTracing]);
+  }, [pathStart, findShortestPath, tracingAllPaths, clearPathTracing, onNodeSelect]);
 
   // Handle node hover
   const handleNodeHover = useCallback((node: SimulationNode | null, prevNode: SimulationNode | null) => {
@@ -1394,6 +1421,17 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
                 </div>
                 <div className="p-1">
                   <button
+                    onClick={() => {
+                      onNodeSelect?.(selectedNode);
+                      setShowNodeMenu(false);
+                      toast.success('Opened investigation panel — Explain · SAR · Safeguard');
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white hover:bg-red-600/50 rounded transition-colors"
+                  >
+                    <AlertTriangle className="h-4 w-4 text-red-400" />
+                    Explain / File SAR
+                  </button>
+                  <button
                     onClick={() => traceAllPaths(selectedNode.id)}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white hover:bg-purple-600/50 rounded transition-colors"
                   >
@@ -1432,12 +1470,21 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
               <Info className="w-4 h-4" />
               Node Details
             </h3>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedNode(null)}>Close</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedNode(null);
+                onNodeSelect?.(null);
+              }}
+            >
+              Close
+            </Button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <div className="text-xs text-muted-foreground">Node ID</div>
-              <div className="font-mono text-sm">{selectedNode.id}</div>
+              <div className="font-mono text-sm break-all">{selectedNode.id}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Risk Level</div>
@@ -1447,7 +1494,7 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Suspicious Score</div>
-              <div className="font-semibold">{(selectedNode.suspicious_score * 100).toFixed(2)}%</div>
+              <div className="font-semibold">{((selectedNode.suspicious_score || 0) * 100).toFixed(2)}%</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Classification</div>
@@ -1477,6 +1524,19 @@ const UltraGraphVisualization = ({ data }: UltraGraphProps) => {
                 <div className="font-semibold">{selectedNode.centrality.pagerank.toFixed(3)}</div>
               </div>
             )}
+          </div>
+          <div className="mt-4">
+            <Button
+              size="sm"
+              className="bg-crypto-purple hover:bg-crypto-dark-purple"
+              onClick={() => {
+                onNodeSelect?.(selectedNode);
+                toast.success('Scroll to investigation panel for Explain · SAR · Safeguard');
+              }}
+            >
+              <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
+              Investigate this wallet
+            </Button>
           </div>
         </Card>
       )}

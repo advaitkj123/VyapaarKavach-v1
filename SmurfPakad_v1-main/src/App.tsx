@@ -25,6 +25,7 @@ import Governance from "./pages/Governance";
 import FederatedDemo from "./pages/FederatedDemo";
 import ComplianceDashboard from "./pages/ComplianceDashboard";
 import Documentation from "./pages/Documentation";
+import Vigilant from "./pages/Vigilant";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +68,11 @@ const App = () => (
           <Route path="/cryptoflow/graph" element={
             <ProtectedRoute>
               <Graph />
+            </ProtectedRoute>
+          } />
+          <Route path="/cryptoflow/vigilant" element={
+            <ProtectedRoute>
+              <Vigilant />
             </ProtectedRoute>
           } />
           <Route path="/cryptoflow/heatmap" element={

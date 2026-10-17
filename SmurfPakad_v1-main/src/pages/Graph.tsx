@@ -6,6 +6,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import UltraGraphVisualization from "@/components/UltraGraphVisualization";
 import NetworkGraph3D from "@/components/NetworkGraph3D";
+import GraphInvestigationPanel, { type InvestigableNode } from "@/components/GraphInvestigationPanel";
 import { graphApi, uploadApi, type GraphData } from "@/lib/api";
 import { enrichGraphRisk, type SmurfPattern } from "@/lib/graphRisk";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -110,6 +111,7 @@ export default function Graph() {
   
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [patterns, setPatterns] = useState<SmurfPattern[]>([]);
+  const [investigatedNode, setInvestigatedNode] = useState<InvestigableNode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useDemo, setUseDemo] = useState(true); // Default to demo mode
@@ -258,6 +260,7 @@ export default function Graph() {
                 onClick={() => {
                   setGraphData(null);
                   setPatterns([]);
+                  setInvestigatedNode(null);
                   setUseDemo(true);
                 }}
                 className="dark:border-gray-600 dark:text-gray-300"
@@ -443,9 +446,22 @@ export default function Graph() {
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-2 max-h-40 overflow-y-auto">
                     {patterns.map((p) => (
-                      <div
+                      <button
+                        type="button"
                         key={p.id}
-                        className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs"
+                        onClick={() => {
+                          const node = (graphData?.nodes || []).find((n: any) => String(n.id) === p.walletId) as any;
+                          setInvestigatedNode({
+                            id: p.walletId,
+                            risk_level: node?.risk_level || (p.score >= 0.65 ? 'high' : 'medium'),
+                            suspicious_score: node?.suspicious_score ?? p.score,
+                            degree: node?.degree,
+                            class: 'illicit',
+                            top_k: true,
+                          });
+                          document.getElementById('investigation-panel')?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-left hover:border-crypto-purple/50 transition-colors w-full"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-medium text-white truncate">{p.walletId}</span>
@@ -453,7 +469,7 @@ export default function Graph() {
                         </div>
                         <div className="text-crypto-purple mt-0.5">{p.fatf} · {p.type.replace('_', ' ')}</div>
                         <div className="text-gray-400 mt-0.5">{p.detail}</div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -493,7 +509,27 @@ export default function Graph() {
             </div>
             <div id="view-2d">
               <ErrorBoundary>
-                <UltraGraphVisualization data={graphData || undefined} />
+                <UltraGraphVisualization
+                  data={graphData || undefined}
+                  onNodeSelect={(n) => {
+                    if (!n) {
+                      setInvestigatedNode(null);
+                      return;
+                    }
+                    setInvestigatedNode({
+                      id: n.id,
+                      risk_level: n.risk_level,
+                      suspicious_score: n.suspicious_score,
+                      degree: n.degree,
+                      class: n.class,
+                      top_k: n.top_k,
+                    });
+                    // Smooth scroll to investigation panel
+                    requestAnimationFrame(() => {
+                      document.getElementById('investigation-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                  }}
+                />
               </ErrorBoundary>
             </div>
             <div id="view-3d" style={{ display: 'none' }} className="rounded-xl overflow-hidden border border-white/10">
@@ -529,6 +565,16 @@ export default function Graph() {
                     : undefined
                 }
               />
+            </div>
+
+            {/* Click-node investigation: Explain · SAR · Safeguard · Cross-platform */}
+            <div id="investigation-panel">
+              <ErrorBoundary>
+                <GraphInvestigationPanel
+                  node={investigatedNode}
+                  onClear={() => setInvestigatedNode(null)}
+                />
+              </ErrorBoundary>
             </div>
           </div>
         )}
