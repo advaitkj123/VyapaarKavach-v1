@@ -227,41 +227,56 @@ export default function AgentChat() {
     try {
       // Determine if this is an investigation or chat
       const isInvestigation = /investigate|check|analyze|scan|score|0x|@/.test(text.toLowerCase());
-      
+
       if (isInvestigation) {
-        // Extract wallet ID
         const walletMatch = text.match(/(?:investigate|check|analyze|scan|score)\s+(.+)/i);
         const walletId = walletMatch?.[1]?.trim() || text;
-        
+
         const report = await agentApi.investigate(walletId);
-        
-        setMessages(prev => prev.map(m =>
-          m.id === loadingMsg.id
-            ? {
-                ...m,
-                content: `Investigation complete for **${walletId}**.`,
-                investigation: report,
-                isLoading: false,
-              }
-            : m
-        ));
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === loadingMsg.id
+              ? {
+                  ...m,
+                  content: `Investigation complete for **${walletId}**.`,
+                  investigation: report,
+                  isLoading: false,
+                }
+              : m
+          )
+        );
       } else {
         const response = await agentApi.chat(text);
-        setMessages(prev => prev.map(m =>
-          m.id === loadingMsg.id
-            ? { ...m, content: response.message, investigation: response.report, isLoading: false }
-            : m
-        ));
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === loadingMsg.id
+              ? {
+                  ...m,
+                  content: response.message || 'No response from agent.',
+                  investigation: response.report,
+                  isLoading: false,
+                }
+              : m
+          )
+        );
       }
     } catch (error) {
       console.error('Agent error:', error);
-      // Ensure loading state is cleared on error
-      setMessages(prev => prev.map(m =>
-        m.id === loadingMsg.id
-          ? { ...m, content: '⚠️ Agent error. Backend may be offline. Try again.', isLoading: false }
-          : m
-      ));
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === loadingMsg.id
+            ? {
+                ...m,
+                content: '⚠️ Agent error. Start the backend (`uvicorn`) and check Backend/.env API keys.',
+                isLoading: false,
+              }
+            : m
+        )
+      );
+    } finally {
       setIsLoading(false);
+    }
   };
 
   const quickActions = [
@@ -378,5 +393,4 @@ export default function AgentChat() {
       </div>
     </div>
   );
-}
 }
