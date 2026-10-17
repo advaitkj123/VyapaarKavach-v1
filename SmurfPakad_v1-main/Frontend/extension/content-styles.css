@@ -1,0 +1,389 @@
+/* SmurfPakad SafeGuard — Content Script Styles */
+/* Injected alongside content.js into payment pages */
+
+/* ============================================================================
+   Warning Overlay
+   ============================================================================ */
+
+#smurfpakad-warning-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2147483647; /* Maximum z-index */
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.sp-overlay-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: sp-fadeIn 0.3s ease-out;
+}
+
+@keyframes sp-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sp-slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes sp-pulseGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 68, 68, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(255, 68, 68, 0.6); }
+}
+
+.sp-warning-card {
+  background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border: 2px solid #ff4444;
+  border-radius: 20px;
+  padding: 28px;
+  max-width: 480px;
+  width: 90vw;
+  color: #e0e0e0;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 68, 68, 0.2);
+  animation: sp-slideUp 0.4s ease-out, sp-pulseGlow 2s ease-in-out infinite;
+}
+
+/* Header */
+.sp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.sp-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sp-shield {
+  font-size: 28px;
+  filter: drop-shadow(0 0 8px rgba(79, 172, 254, 0.5));
+}
+
+.sp-brand {
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 0.5px;
+}
+
+.sp-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #999;
+  font-size: 18px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.sp-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* Status Bar */
+.sp-status-bar {
+  padding: 14px 18px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.sp-status-icon {
+  font-size: 22px;
+}
+
+.sp-status-text {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* Risk Meter */
+.sp-risk-meter {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.sp-risk-label {
+  font-size: 13px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.sp-risk-bar-container {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.sp-risk-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 1s ease-out;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.sp-risk-value {
+  font-size: 20px;
+  font-weight: 800;
+  min-width: 60px;
+  text-align: right;
+}
+
+/* Payment Info */
+.sp-payment-info {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.sp-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sp-info-row:last-child {
+  border-bottom: none;
+}
+
+.sp-info-label {
+  color: #888;
+  font-size: 13px;
+}
+
+.sp-info-value {
+  color: #e0e0e0;
+  font-weight: 600;
+  font-size: 13px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Detection Reasons */
+.sp-reasons {
+  margin-bottom: 20px;
+}
+
+.sp-reasons-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ccc;
+  margin-bottom: 8px;
+}
+
+.sp-reasons-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sp-reasons-list li {
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  background: rgba(255, 68, 68, 0.08);
+  border-left: 3px solid rgba(255, 68, 68, 0.4);
+  border-radius: 0 8px 8px 0;
+  font-size: 12.5px;
+  color: #ccc;
+  line-height: 1.4;
+}
+
+/* Action Buttons */
+.sp-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sp-btn {
+  padding: 14px 24px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+.sp-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.sp-btn:active {
+  transform: translateY(0);
+}
+
+.sp-btn-danger {
+  background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 68, 68, 0.3);
+}
+
+.sp-btn-warning {
+  background: linear-gradient(135deg, #ffaa00 0%, #ff8800 100%);
+  color: #1a1a1a;
+  box-shadow: 0 4px 15px rgba(255, 170, 0, 0.3);
+}
+
+.sp-btn-safe {
+  background: linear-gradient(135deg, #44cc44 0%, #22aa22 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(68, 204, 68, 0.3);
+}
+
+.sp-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #aaa;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.sp-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ddd;
+}
+
+/* Footer */
+.sp-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sp-powered {
+  font-size: 11px;
+  color: #666;
+}
+
+.sp-local-badge, .sp-cloud-badge {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.sp-local-badge {
+  background: rgba(255, 170, 0, 0.15);
+  color: #ffaa00;
+}
+
+.sp-cloud-badge {
+  background: rgba(79, 172, 254, 0.15);
+  color: #4facfe;
+}
+
+/* ============================================================================
+   SafeGuard Badge (Bottom-Right Corner)
+   ============================================================================ */
+
+#smurfpakad-badge {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2147483640;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.sp-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid rgba(79, 172, 254, 0.3);
+  border-radius: 30px;
+  color: #4facfe;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: default;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 15px rgba(79, 172, 254, 0.1);
+  transition: all 0.3s;
+  animation: sp-badgePulse 3s ease-in-out infinite;
+}
+
+.sp-badge:hover {
+  border-color: rgba(79, 172, 254, 0.6);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 25px rgba(79, 172, 254, 0.2);
+}
+
+@keyframes sp-badgePulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; }
+}
+
+.sp-badge-icon {
+  font-size: 16px;
+}
+
+.sp-badge-text {
+  letter-spacing: 0.5px;
+}
+
+/* ============================================================================
+   Cancelled Notice
+   ============================================================================ */
+
+#smurfpakad-cancelled-notice {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.sp-notice {
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid rgba(79, 172, 254, 0.4);
+  border-radius: 12px;
+  color: #4facfe;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  animation: sp-slideDown 0.4s ease-out;
+}
+
+@keyframes sp-slideDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

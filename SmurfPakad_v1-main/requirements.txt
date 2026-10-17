@@ -1,0 +1,21 @@
+# Core PyTorch and PyTorch Geometric
+torch>=2.0.0
+torch-geometric>=2.3.0
+
+# PyTorch Geometric transitive dependencies (typically installed with torch-geometric)
+torch-scatter>=2.1.0
+torch-sparse>=0.6.0
+torch-cluster>=1.6.0
+torch-spline-conv>=1.2.0
+
+# Entmax for sparse attention mechanisms
+entmax>=1.0
+
+# Data processing and ML utilities
+pandas>=1.5.0
+numpy>=1.21.0
+scikit-learn>=1.2.0
+
+# Optional: For API server (mentioned in README.md)
+# fastapi>=0.100.0
+# uvicorn>=0.23.0

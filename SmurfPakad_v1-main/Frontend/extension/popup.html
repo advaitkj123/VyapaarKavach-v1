@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmurfPakad SafeGuard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 360px;
+      min-height: 500px;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(145deg, #0a0a1a 0%, #111133 50%, #0a1628 100%);
+      color: #e0e0e0;
+    }
+
+    /* Header */
+    .header {
+      padding: 20px;
+      text-align: center;
+      border-bottom: 1px solid rgba(79, 172, 254, 0.15);
+      background: linear-gradient(180deg, rgba(79, 172, 254, 0.05) 0%, transparent 100%);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .logo-icon { font-size: 28px; }
+    .logo-text {
+      font-size: 20px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 11px;
+      color: #666;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    /* Toggle */
+    .toggle-section {
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .toggle-label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 26px;
+    }
+
+    .toggle-switch input { display: none; }
+
+    .toggle-slider {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #333;
+      border-radius: 13px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .toggle-slider:before {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      left: 3px;
+      top: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: all 0.3s;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(24px);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 800;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .stat-safe .stat-value { color: #44cc44; }
+    .stat-warn .stat-value { color: #ffaa00; }
+    .stat-block .stat-value { color: #ff4444; }
+    .stat-total .stat-value { color: #4facfe; }
+
+    /* Recent Activity */
+    .section-title {
+      padding: 14px 20px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .activity-list {
+      padding: 0 20px 16px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 10px;
+      border-left: 3px solid transparent;
+    }
+
+    .activity-item.risk-low { border-left-color: #44cc44; }
+    .activity-item.risk-medium { border-left-color: #ffaa00; }
+    .activity-item.risk-high { border-left-color: #ff4444; }
+    .activity-item.risk-critical { border-left-color: #ff0000; }
+
+    .activity-icon { font-size: 18px; }
+
+    .activity-info { flex: 1; }
+
+    .activity-recipient {
+      font-size: 12px;
+      font-weight: 600;
+      color: #ccc;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .activity-meta {
+      font-size: 10px;
+      color: #666;
+    }
+
+    .activity-score {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .activity-score.score-low { color: #44cc44; }
+    .activity-score.score-medium { color: #ffaa00; }
+    .activity-score.score-high { color: #ff4444; }
+
+    .empty-state {
+      text-align: center;
+      padding: 30px 20px;
+      color: #555;
+      font-size: 13px;
+    }
+
+    .empty-state-icon {
+      font-size: 36px;
+      margin-bottom: 8px;
+      opacity: 0.5;
+    }
+
+    /* Footer */
+    .footer {
+      padding: 14px 20px;
+      text-align: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .footer-text {
+      font-size: 10px;
+      color: #444;
+    }
+
+    .footer-link {
+      color: #4facfe;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(79, 172, 254, 0.2);
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <span class="logo-icon">🛡️</span>
+      <span class="logo-text">SmurfPakad</span>
+    </div>
+    <div class="subtitle">AI Payment SafeGuard</div>
+  </div>
+
+  <div class="toggle-section">
+    <span class="toggle-label">SafeGuard Protection</span>
+    <label class="toggle-switch">
+      <input type="checkbox" id="toggle-safeguard" checked>
+      <span class="toggle-slider"></span>
+    </label>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card stat-total">
+      <span class="stat-value" id="stat-total">0</span>
+      <span class="stat-label">Scanned</span>
+    </div>
+    <div class="stat-card stat-safe">
+      <span class="stat-value" id="stat-safe">0</span>
+      <span class="stat-label">Safe</span>
+    </div>
+    <div class="stat-card stat-warn">
+      <span class="stat-value" id="stat-warnings">0</span>
+      <span class="stat-label">Warnings</span>
+    </div>
+    <div class="stat-card stat-block">
+      <span class="stat-value" id="stat-blocked">0</span>
+      <span class="stat-label">Blocked</span>
+    </div>
+  </div>
+
+  <div class="section-title">Recent Activity</div>
+  <div class="activity-list" id="activity-list">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-state-icon">🔍</div>
+      <div>No transactions scanned yet.<br>Navigate to a payment page to begin.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="footer-text">Powered by <a href="#" class="footer-link">GATv2 Neural Network</a> • v1.0.0</span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

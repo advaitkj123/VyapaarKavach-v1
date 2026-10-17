@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "SmurfPakad SafeGuard",
+  "version": "1.0.0",
+  "description": "AI-powered payment security — detects suspicious transactions in real-time using Graph Neural Networks before you pay.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "notifications",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://paytm.com/*",
+    "https://*.paytm.com/*",
+    "https://pay.google.com/*",
+    "https://*.phonepe.com/*",
+    "https://www.phonepe.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://paytm.com/*",
+        "https://*.paytm.com/*",
+        "https://pay.google.com/*",
+        "https://*.phonepe.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content-styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["warning-overlay.html", "icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "SmurfPakad — AML Intelligence",
+  "short_name": "SmurfPakad",
+  "description": "AI-powered Anti-Money Laundering detection across UPI platforms using Graph Neural Networks",
+  "start_url": "/cryptoflow/dashboard",
+  "display": "standalone",
+  "background_color": "#050510",
+  "theme_color": "#7c3aed",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["finance", "security", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "AI Agent",
+      "short_name": "Agent",
+      "description": "Launch autonomous AML investigation",
+      "url": "/cryptoflow/agent",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Upload Data",
+      "short_name": "Upload",
+      "description": "Upload transaction CSV for analysis",
+      "url": "/cryptoflow/upload",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

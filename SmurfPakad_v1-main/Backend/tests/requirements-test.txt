@@ -1,0 +1,21 @@
+# Test dependencies for SMURF HUNTER Backend
+
+# Testing framework
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+
+# HTTP client for async tests
+httpx>=0.24.0
+
+# Coverage reporting
+coverage>=7.0.0
+
+# Test utilities
+faker>=18.0.0
+factory-boy>=3.2.0
+
+# Performance testing (optional)
+# locust>=2.15.0
+# pytest-benchmark>=4.0.0

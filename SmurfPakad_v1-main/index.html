@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmurfPakad | AI-Powered AML Detection — Cross-Platform UPI Intelligence</title>
+    <meta name="description" content="Detect cross-platform money laundering (smurfing) across Paytm, PhonePe, and GPay using Graph Neural Networks, Federated Learning, and IBM watsonx.ai." />
+    <meta name="author" content="SmurfPakad — TristackOverflow" />
+    <meta name="keywords" content="AML, anti-money laundering, GNN, federated learning, UPI, fintech, IBM watsonx, RegTech" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#7c3aed" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SmurfPakad" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="SmurfPakad | AI-Powered AML Detection" />
+    <meta property="og:description" content="Graph Neural Networks + Federated Learning + IBM watsonx.ai for cross-platform UPI money laundering detection." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icons/icon-512.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@smurfpakad" />
+    <meta name="twitter:image" content="/icons/icon-512.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+
+    <!-- Font preloads -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet" />
+  </head>
+
+  <body>
+    <div id="error-overlay" style="display:none; position:fixed; z-index:9999; background:red; color:white; padding:20px; top:0; left:0; right:0;"></div>
+    <script>
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+        var el = document.getElementById('error-overlay');
+        el.style.display = 'block';
+        el.innerHTML += '<p>' + msg + '<br/>' + url + ':' + lineNo + ':' + columnNo + '<br/>' + (error && error.stack ? error.stack : '') + '</p>';
+        return false;
+      };
+      window.onunhandledrejection = function(event) {
+        var el = document.getElementById('error-overlay');
+        el.style.display = 'block';
+        el.innerHTML += '<p>Unhandled Promise Rejection: ' + event.reason + '</p>';
+      };
+    </script>
+    <div id="root"></div>
+    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
+    <!-- <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script> -->
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SmurfPakad SW registered:', reg.scope))
+            .catch(err => console.warn('SW registration failed:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
+

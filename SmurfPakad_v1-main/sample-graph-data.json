@@ -1,0 +1,173 @@
+{
+  "meta": {
+    "k": 20,
+    "hop": 2,
+    "total_nodes": 15,
+    "total_edges": 18,
+    "generated_at": "2026-01-31T14:30:00Z"
+  },
+  "nodes": [
+    {
+      "id": "tx_001",
+      "label": "transaction",
+      "suspicious_score": 0.9987,
+      "risk_level": "high",
+      "class": "illicit",
+      "top_k": true,
+      "degree": { "in": 7, "out": 5 }
+    },
+    {
+      "id": "tx_002",
+      "label": "transaction",
+      "suspicious_score": 0.8765,
+      "risk_level": "medium",
+      "class": "illicit",
+      "top_k": false,
+      "degree": { "in": 3, "out": 8 }
+    },
+    {
+      "id": "tx_003",
+      "label": "transaction",
+      "suspicious_score": 0.9543,
+      "risk_level": "high",
+      "class": "illicit",
+      "top_k": true,
+      "degree": { "in": 12, "out": 4 }
+    },
+    {
+      "id": "tx_004",
+      "label": "transaction",
+      "suspicious_score": 0.6543,
+      "risk_level": "low",
+      "class": "licit",
+      "top_k": false,
+      "degree": { "in": 2, "out": 3 }
+    },
+    {
+      "id": "tx_005",
+      "label": "transaction",
+      "suspicious_score": 0.8901,
+      "risk_level": "medium",
+      "class": "illicit",
+      "top_k": false,
+      "degree": { "in": 5, "out": 6 }
+    },
+    {
+      "id": "tx_006",
+      "label": "transaction",
+      "suspicious_score": 0.9876,
+      "risk_level": "high",
+      "class": "illicit",
+      "top_k": true,
+      "degree": { "in": 15, "out": 3 }
+    },
+    {
+      "id": "tx_007",
+      "label": "transaction",
+      "suspicious_score": 0.7234,
+      "risk_level": "medium",
+      "class": "illicit",
+      "top_k": false,
+      "degree": { "in": 4, "out": 7 }
+    },
+    {
+      "id": "tx_008",
+      "label": "transaction",
+      "suspicious_score": 0.5234,
+      "risk_level": "low",
+      "class": "licit",
+      "top_k": false,
+      "degree": { "in": 1, "out": 2 }
+    },
+    {
+      "id": "tx_009",
+      "label": "transaction",
+      "suspicious_score": 0.9654,
+      "risk_level": "high",
+      "class": "illicit",
+      "top_k": true,
+      "degree": { "in": 9, "out": 11 }
+    },
+    {
+      "id": "tx_010",
+      "label": "transaction",
+      "suspicious_score": 0.8123,
+      "risk_level": "medium",
+      "class": "illicit",
+      "top_k": false,
+      "degree": { "in": 6, "out": 5 }
+    },
+    {
+      "id": "tx_011",
+      "label": "transaction",
+      "suspicious_score": 0.9123,
+      "risk_level": "high",
+      "class": "illicit",
+      "top_k": true,
+      "degree": { "in": 8, "out": 7 }
+    },
+    {
+      "id": "tx_012",
+      "label": "transaction",
+      "suspicious_score": 0.7456,
+      "risk_level": "medium",
+      "class": "illicit",
+      "top_k": false,
+      "degree": { "in": 4, "out": 5 }
+    },
+    {
+      "id": "tx_013",
+      "label": "transaction",
+      "suspicious_score": 0.6789,
+      "risk_level": "low",
+      "class": "licit",
+      "top_k": false,
+      "degree": { "in": 3, "out": 2 }
+    },
+    {
+      "id": "tx_014",
+      "label": "transaction",
+      "suspicious_score": 0.9789,
+      "risk_level": "high",
+      "class": "illicit",
+      "top_k": true,
+      "degree": { "in": 11, "out": 9 }
+    },
+    {
+      "id": "tx_015",
+      "label": "transaction",
+      "suspicious_score": 0.8456,
+      "risk_level": "medium",
+      "class": "illicit",
+      "top_k": false,
+      "degree": { "in": 5, "out": 8 }
+    }
+  ],
+  "edges": [
+    { "source": "tx_001", "target": "tx_002", "weight": 1.0, "high_risk": true, "flow": "out" },
+    { "source": "tx_001", "target": "tx_003", "weight": 0.9, "high_risk": true, "flow": "out" },
+    { "source": "tx_002", "target": "tx_004", "weight": 0.6, "high_risk": false, "flow": "out" },
+    { "source": "tx_003", "target": "tx_005", "weight": 0.85, "high_risk": true, "flow": "out" },
+    { "source": "tx_005", "target": "tx_006", "weight": 0.95, "high_risk": true, "flow": "out" },
+    { "source": "tx_006", "target": "tx_007", "weight": 0.78, "high_risk": true, "flow": "out" },
+    { "source": "tx_007", "target": "tx_008", "weight": 0.55, "high_risk": false, "flow": "out" },
+    { "source": "tx_001", "target": "tx_009", "weight": 0.97, "high_risk": true, "flow": "out" },
+    { "source": "tx_009", "target": "tx_010", "weight": 0.82, "high_risk": true, "flow": "out" },
+    { "source": "tx_006", "target": "tx_009", "weight": 0.91, "high_risk": true, "flow": "out" },
+    { "source": "tx_010", "target": "tx_008", "weight": 0.65, "high_risk": false, "flow": "out" },
+    { "source": "tx_004", "target": "tx_005", "weight": 0.45, "high_risk": false, "flow": "out" },
+    { "source": "tx_011", "target": "tx_001", "weight": 0.92, "high_risk": true, "flow": "out" },
+    { "source": "tx_011", "target": "tx_012", "weight": 0.75, "high_risk": true, "flow": "out" },
+    { "source": "tx_012", "target": "tx_013", "weight": 0.68, "high_risk": false, "flow": "out" },
+    { "source": "tx_014", "target": "tx_011", "weight": 0.98, "high_risk": true, "flow": "out" },
+    { "source": "tx_014", "target": "tx_015", "weight": 0.86, "high_risk": true, "flow": "out" },
+    { "source": "tx_015", "target": "tx_010", "weight": 0.79, "high_risk": true, "flow": "out" }
+  ],
+  "summary": {
+    "top_illicit_ratio": 1.0,
+    "fan_out_nodes": 8,
+    "fan_in_nodes": 10,
+    "avg_suspicious_score": 0.83,
+    "model_confidence": "high"
+  }
+}
